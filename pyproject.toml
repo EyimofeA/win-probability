@@ -1,0 +1,14 @@
+[project]
+name = "win-probability"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "nba-api>=1.11.4",
+    "numpy>=2.4.6",
+    "pandas>=3.0.3",
+    "pyarrow>=24.0.0",
+    "ruff>=0.15.18",
+    "tqdm>=4.68.3",
+]
