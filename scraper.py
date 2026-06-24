@@ -42,7 +42,7 @@ def process_pbp(df):
 
     df['margin'] = df['scoreHome'] - df['scoreAway']
 
-    home_won = int(last_row['scoreHome']> last_row['scoreAway']) 
+    home_won = int(df['scoreHome'].iloc[-1] > df['scoreAway'].iloc[-1]) 
     df['home_won'] = home_won
 
     training_df = df.dropna(subset=['margin','seconds_left'])[['gameId','margin','seconds_left','home_won','period']]
@@ -50,6 +50,7 @@ def process_pbp(df):
     return training_df
 
 def scrape_seasons(game_ids,limit = None):
+    processed_dfs = []
     dfs = []
     if limit is None:
         ids_to_process = game_ids
@@ -59,17 +60,19 @@ def scrape_seasons(game_ids,limit = None):
         game_df = fetch_pbp(gid)
         if game_df is None:
             continue
-
+        dfs.append(game_df)
         game_pbp = process_pbp(game_df)
-        dfs.append(game_pbp)
-        time.sleep(0.6)
-    wp_training_data = pd.concat(dfs,ignore_index=True)
-    return wp_training_data
+        processed_dfs.append(game_pbp)
+        # time.sleep(0.6)
+    raw_pbp = pd.concat(dfs,ignore_index=True)
+    wp_training_data = pd.concat(processed_dfs,ignore_index=True)
+    return raw_pbp, wp_training_data
 
 
 if __name__ == "__main__":
     season = "2025-26"
     game_ids = get_season_game_ids(season=season)
-    training_data = scrape_seasons(game_ids,limit = None)
+    raw,wp = scrape_seasons(game_ids,limit = None)
     print(f"No error {season} processed")
-    training_data.to_parquet(f"training_data_{season}.parquet")
+    raw.to_parquet(f"raw_training_data_{season}.parquet")
+    wp.to_parquet(f"wp_training_data_{season}.parquet")
