@@ -47,8 +47,8 @@ def stable_sigmoid(x):
     return result
 
 def model(x):
-    p =  p = stable_sigmoid(x @ w + b)
-    p = np.clip(p,1e-15,1e15)
+    p = stable_sigmoid(x @ w + b)
+    p = np.clip(p,1e-15,1-1e-15)
     return p
 
 for e in range(epochs):
@@ -71,7 +71,7 @@ for e in range(epochs):
     if np.abs(dldw).sum() + abs(dldb) < 1e-8: #early stopping using gradient norm.
         break
 
-print(f"Final weights are {w} and {b}")
+print(f"Final weights are {w=}\n and {b}")
 
 N_test,D = test.shape
 X_test = test[:,:2]
