@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
 folder_path = "."
 df = pd.read_parquet(f"{folder_path}/wp_training_data_2025-26.parquet")
@@ -68,7 +69,7 @@ for e in range(epochs):
 
     if e % (epochs/20) ==0:
         print(f"Epoch = {e}, loss = {loss}, dw = {(w-temp_w).sum()}")
-    if np.abs(dldw).sum() + abs(dldb) < 1e-8: #early stopping using gradient norm.
+    if np.abs(dldw).sum() + abs(dldb) < 1e-15: #early stopping using gradient norm.
         break
 
 print(f"Final weights are {w=}\n and {b}")
@@ -80,4 +81,25 @@ x_test = (X_test - x_mean)/x_std
 y_test = Y_test
 
 brier_score = np.square((model(x_test) - y_test)).mean()
-print(brier_score)
+print(f"Model brier_score is {brier_score}")
+
+test_preds = model(x_test).squeeze() #N
+bins = np.arange(0,1.1,0.1)
+inds = np.digitize(test_preds,bins)
+bin_count = np.bincount(inds)
+bin_val = np.bincount(inds,weights=test_preds)
+t_val = np.bincount(inds,weights=y_test.squeeze())
+bin_avg = bin_val/bin_count
+bin_tavg =t_val/bin_count
+
+fig,(ax1,ax2) = plt.subplots(2,1)
+
+ax1.plot(bin_avg,bin_tavg,color = "black")
+ax1.axline((0,0),slope = 1,color = "red")
+ax1.set(xlim=(0,1),ylim=(0,1),xlabel="Model Prediction",ylabel="Observed Result",title="V1 Reliability Curve")
+
+ax2.hist(test_preds,bins=10)
+ax2.set(xlabel="Model Prediction",ylabel="Count",title="Freq of Preds")
+plt.tight_layout()
+# plt.show()
+
