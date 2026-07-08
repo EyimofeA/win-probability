@@ -13,9 +13,11 @@ venv/
 # Data files (regenerate by running scraper)
 *.parquet
 *.csv
+*.npz
 
 # Jupyter
 .ipynb_checkpoints/
+*.ipynb
 
 # OS
 .DS_Store
@@ -25,4 +27,4 @@ venv/
 
 # 
 testing/
-notes.md
+*.md
