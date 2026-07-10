@@ -53,6 +53,58 @@ def plot_diags(preds,test):
 
     # plt.tight_layout()
     # plt.show()
+def plot_reliability_curve(preds, test):
+    preds = preds.squeeze()
+    test = test.squeeze()
+    
+    # Binning logic
+    bins = np.arange(0, 1.1, 0.1)
+    inds = np.digitize(preds, bins)
+    bin_count = np.bincount(inds)
+    bin_val = np.bincount(inds, weights=preds)
+    t_val = np.bincount(inds, weights=test)
+    
+    # Safety: Only calculate averages for bins that actually have data
+    # This prevents division-by-zero warnings if a 10% bracket is empty
+    valid_bins = bin_count > 0
+    bin_avg = bin_val[valid_bins] / bin_count[valid_bins]
+    bin_tavg = t_val[valid_bins] / bin_count[valid_bins]
+
+    # --- BEARS BLOG STYLING ---
+    plt.rcParams['font.family'] = 'sans-serif'
+    plt.rcParams['font.sans-serif'] = ['Helvetica', 'Arial', 'DejaVu Sans']
+    plt.rcParams.update({'font.size': 14})
+
+    # Force a square figure so the 1:1 slope isn't distorted
+    plt.figure(figsize=(8, 8))
+
+    # 1. Perfect Calibration Line (Subtle)
+    plt.plot([0, 1], [0, 1], linestyle='--', color='gray', alpha=0.7, label='Perfect Calibration')
+
+    # 2. Model Reliability Line (Bold with markers)
+    plt.plot(bin_avg, bin_tavg, marker='o', color='#000000', linewidth=2.5, markersize=8, label='V1 Model')
+
+    # Axes and Labels
+    plt.xlim(0, 1)
+    plt.ylim(0, 1)
+    plt.xlabel("Model Prediction (Binned Probability)")
+    plt.ylabel("Observed Result (Actual Win Rate)")
+    plt.title("V1 Reliability Diagram", pad=20, fontweight='bold')
+
+    # Clean Legend (No bounding box)
+    plt.legend(loc="upper left", frameon=False)
+
+    # Add a very faint grid to help the eye measure deviation
+    plt.grid(True, linestyle=':', alpha=0.4)
+
+    # Remove spines
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+
+    # Export
+    plt.savefig("outputs/v1_reliability_curve.svg", format='svg',  bbox_inches='tight')
+    plt.savefig("outputs/v1_reliability_curve.png", format='png',  bbox_inches='tight')
+    plt.show()
 if __name__ == "__main__":
     print("Starting training loop...")
     folder_path = "."
@@ -127,4 +179,5 @@ if __name__ == "__main__":
 
 
     plot_diags(test_preds,y_test)
+    plot_reliability_curve(test_preds,y_test)
 
