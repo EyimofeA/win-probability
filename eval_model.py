@@ -85,14 +85,14 @@ def plot_reliability_curve(preds, test):
     plt.plot([0, 1], [0, 1], linestyle='--', color='gray', alpha=0.7, label='Perfect Calibration')
 
     # 2. Model Reliability Line (Bold with markers)
-    plt.plot(bin_avg, bin_tavg, marker='o', color='#000000', linewidth=2.5, markersize=8, label='V1 Model')
+    plt.plot(bin_avg, bin_tavg, marker='o', color='#000000', linewidth=2.5, markersize=8, label=f'{MODEL_NAME}')
 
     # Axes and Labels
     plt.xlim(0, 1)
     plt.ylim(0, 1)
     plt.xlabel("Model Prediction (Binned Probability)")
     plt.ylabel("Observed Result (Actual Win Rate)")
-    plt.title("V1 Reliability Diagram", pad=20, fontweight='bold')
+    plt.title(f"{MODEL_NAME} Reliability Diagram", pad=20, fontweight='bold')
 
     # Clean Legend (No bounding box)
     plt.legend(loc="upper left", frameon=False)
@@ -111,7 +111,7 @@ def plot_reliability_curve(preds, test):
     return ece
     
 if __name__ == "__main__":
-    MODEL_NAME = "2026-07-14-v2-stern.npz"
+    MODEL_NAME = "2026-07-14-v2-stern-with-clip.npz"
     print("Starting training loop...")
 
     data_path = "./data"
@@ -130,6 +130,12 @@ if __name__ == "__main__":
     train = df.loc[train_ids]
     test = df.loc[~df.index.isin(train.index)]
 
+    # clip based on train only
+    lower = train["margin_per_sqrt_time"].quantile(0.01)
+    upper = train["margin_per_sqrt_time"].quantile(0.99)
+    train["margin_per_sqrt_time"] = train["margin_per_sqrt_time"].clip(lower,upper)
+    test["margin_per_sqrt_time"] = test["margin_per_sqrt_time"].clip(lower,upper)
+   
     features = ["margin","seconds_left","margin_time_interaction","margin_per_sqrt_time","sqrt_time_frac"]
     target = ["home_won"]
 
@@ -187,7 +193,7 @@ if __name__ == "__main__":
     ece = plot_reliability_curve(test_preds,y_test)
     print(f"Model ECE is {ece}")
 
-    np.savez(f"models/{MODEL_NAME}", weights = w,biases = b,scaler_mean = x_mean, scaler_std = x_std,feature_names= features)
+    np.savez(f"models/{MODEL_NAME}", weights = w,biases = b,scaler_mean = x_mean, scaler_std = x_std,feature_names= features,clipping_percentile = {lower,upper})
     print("Model saved")
 
     
