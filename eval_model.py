@@ -41,7 +41,7 @@ def plot_diags(preds,test):
 
     ax1.plot(bin_avg,bin_tavg,color = "black")
     ax1.axline((0,0),slope = 1,color = "red")
-    ax1.set(xlim=(0,1),ylim=(0,1),xlabel="Model Prediction",ylabel="Observed Result",title="V1 Reliability Curve")
+    ax1.set(xlim=(0,1),ylim=(0,1),xlabel="Model Prediction",ylabel="Observed Result",title=f"{MODEL_NAME} Reliability Curve")
 
     ax2.hist(preds,bins=10)
     ax2.set(xlabel="Model Prediction",ylabel="Count",title="Freq of Preds")
@@ -69,6 +69,9 @@ def plot_reliability_curve(preds, test):
     valid_bins = bin_count > 0
     bin_avg = bin_val[valid_bins] / bin_count[valid_bins]
     bin_tavg = t_val[valid_bins] / bin_count[valid_bins]
+    bin_count = bin_count[valid_bins]
+
+    ece = np.average(np.abs(bin_avg - bin_tavg),weights=bin_count)
 
     # --- BEARS BLOG STYLING ---
     plt.rcParams['font.family'] = 'sans-serif'
@@ -102,16 +105,23 @@ def plot_reliability_curve(preds, test):
     plt.gca().spines['right'].set_visible(False)
 
     # Export
-    plt.savefig("outputs/v1_reliability_curve.svg", format='svg',  bbox_inches='tight')
-    plt.savefig("outputs/v1_reliability_curve.png", format='png',  bbox_inches='tight')
+    plt.savefig(f"outputs/{MODEL_NAME}_reliability_curve.svg", format='svg',  bbox_inches='tight')
+    plt.savefig(f"outputs/{MODEL_NAME}_reliability_curve.png", format='png',  bbox_inches='tight')
     plt.show()
+    return ece
+    
 if __name__ == "__main__":
+    MODEL_NAME = "2026-07-14-v2-stern.npz"
     print("Starting training loop...")
-    folder_path = "."
-    df = pd.read_parquet(f"{folder_path}/wp_training_data_2025-26.parquet")
+
+    data_path = "./data"
+    df = pd.read_parquet(f"{data_path}/wp_training_data_2025-26.parquet")
 
     # feature eng
-    df["margin_x_seconds_left"] = df["margin"] * df["seconds_left"]
+    df["margin_time_interaction"] = df["margin"] * df["seconds_left"]
+    df["time_frac_remaining"] = df["seconds_left"] / 2880 #normalized 1 -> 0
+    df["margin_per_sqrt_time"] = df["margin"] / np.sqrt(df["seconds_left"]+1)
+    df["sqrt_time_frac"] = np.sqrt(df["seconds_left"]/2880)
 
     game_ids = df["gameId"].unique()
     rng = np.random.default_rng(seed=42)
@@ -120,7 +130,7 @@ if __name__ == "__main__":
     train = df.loc[train_ids]
     test = df.loc[~df.index.isin(train.index)]
 
-    features = ["margin","seconds_left","margin_x_seconds_left"]
+    features = ["margin","seconds_left","margin_time_interaction","margin_per_sqrt_time","sqrt_time_frac"]
     target = ["home_won"]
 
     train = train[features + target].to_numpy()
@@ -141,12 +151,12 @@ if __name__ == "__main__":
 
     learning_rate = 0.1
     epochs = 10000 #will try other methods, easier for now
-
+    losses = []
     for e in range(epochs):
-    # forward pass
+        # forward pass
         p = model(x,w,b) 
         loss = - (y * np.log(p) + (1-y)*np.log(1-p)).mean()
-
+        losses.append(loss)
 
         # loss.backwards() smh i wish
         dldw = (x.T @ (p-y)) / N_train
@@ -156,13 +166,14 @@ if __name__ == "__main__":
         b = b - learning_rate * dldb
 
         if e % (epochs/20) ==0:
-            print(f"Epoch = {e}, loss = {loss}, dw = {(w-temp_w).sum()}")
+            learning_rate*=0.9
+            print(f"Epoch = {e}, loss = {loss:.4f}, grad_norm = {(np.abs(dldw).sum() + abs(dldb)):.4f}, eta = {learning_rate:.4f}")
         # if np.abs(dldw).sum() + abs(dldb) < 1e-15: #early stopping using gradient norm.
         #     break
 
     print(f"Final weights are {w=}\n and {b}")
 
-    N_test,D = test.shape
+    N_test,_ = test.shape
     X_test = test[:,:-1]
     Y_test = test[:,-1].reshape(-1,1)
     x_test = (X_test - x_mean)/x_std
@@ -171,13 +182,17 @@ if __name__ == "__main__":
     brier_score = np.square((model(x_test,w,b) - y_test)).mean()
     print(f"Model brier_score is {brier_score}")
 
-    np.savez("v1 model", weights = w,biases = b,scaler_mean = x_mean, scaler_std = x_std)
+    test_preds = model(x_test,w,b)
+    # plot_diags(test_preds,y_test)
+    ece = plot_reliability_curve(test_preds,y_test)
+    print(f"Model ECE is {ece}")
+
+    np.savez(f"models/{MODEL_NAME}", weights = w,biases = b,scaler_mean = x_mean, scaler_std = x_std,feature_names= features)
     print("Model saved")
 
-    test_preds = model(x_test,w,b)
+    
 
 
 
-    plot_diags(test_preds,y_test)
-    plot_reliability_curve(test_preds,y_test)
+    
 
